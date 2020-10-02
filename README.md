@@ -1,60 +1,55 @@
 # Concept Graph
+This is a node based, procedural content creation tool.
+You have a collection of nodes that you connect together to create a complex result. You can see it as a form
+of visual scripting, but for 3D models generation.
 
-An addon for node based content creation directly from the Godot engine editor.
+## Overview
 
-The graph node can be as simple ![image](https://user-images.githubusercontent.com/52043844/75927366-850e3080-5e6c-11ea-8596-ea8e1450c9e2.png)
+The graph node can be as simple ...
+![image](https://user-images.githubusercontent.com/52043844/82753238-77f64300-9dc4-11ea-9526-f7ada2883abc.png)
 
-... or as complicated as you want ![image](https://user-images.githubusercontent.com/52043844/75927502-c69edb80-5e6c-11ea-9f40-21c1f9684786.png)
-
-[Video example 1](https://streamable.com/1gke2)
-
-[Video example 2](https://streamable.com/sh3dhr)
+... or as complicated as you want ![image](https://user-images.githubusercontent.com/52043844/82753149-d0791080-9dc3-11ea-8b76-035d7115ee55.png)
 
 ## Status
 
-This addon is still a **work in progress**. Until it hits version 1.0, it is not
+This tool is still a **work in progress**. Until it hits version 1.0, it is not
 considered production ready and there's no guarantees the files generated with
 this addon will be compatible with later versions.
 
+### Important note
 
-### Known issues and roadmap
+This tool started as a Godot Engine addon but is currently been transitionned to be a standalone software.
+More information here https://www.youtube.com/watch?v=RVSum5m2suU
 
-#### General issues
-+ Save files needs improvement to make them work with future versions.
-+ Missing Undo/Redo support
-+ Search bar in the **Add node panel** doesn't work.
-+ Overall performance could be improved.
+This means you will no longer need to use this from the Godot editor, but simply download and use ConceptGraph as any other tool.
+The current release is a preview version. I expect bugs and regressions as it was not fully tested on all target platforms. OSX versions are
+known to be troublesome.
 
-#### Graph nodes issues
-+ No **Output** node by default.
-+ Duplicating graph nodes doesn't work.
-
-#### Roadmap
-
-1. Make it work
-2. Make it user friendly
-3. Make it fast
-
-+ Right now my focus is on user experience and stability. I'm working on this tool
-while also using it for my own game so I can actually see what's missing and
-what part of the workflow could be improved for real world use.
-+ New features will be added as I need them when the overall usability will be
-good enough for most people.
-+ Comment nodes, groups and other QoL features are planned.
-+ At some point, I'd like to add some sort of control flow (conditional and loops)
-but it likely won't be implemented anytime soon.
 
 ## Quick start
 
-[Check out the wiki](https://github.com/HungryProton/concept_graph/wiki) for detailled explainations
+[Check out the wiki](https://github.com/HungryProton/concept_graph/wiki) for detailed explanations
 
-Check out the **examples folder** at the root of the addon folder for pre-made
-templates and example scences.
 
-Check out [this video tutorial](https://www.youtube.com/watch?v=hLFgfyKbPoU) for a step by step guide on how to create your first graph
+## Known issues and roadmap
 
-## Licence
++ For a list of known issues, [head over the issue tracker](https://github.com/HungryProton/concept_graph/issues)
++ To track the work in progress and planned feature, [head over the project board](https://github.com/HungryProton/concept_graph/projects)
 
-+ Unless stated otherwise, everything in this repository is MIT licenced.
-+ The textures and 3d models found in the assets folder come from https://kenney.nl/ under a CC0 licence.
+The **current focus** is to get the standalone version in a working state and **add a lot of documentation**.
+Even though ConceptGraph doesn't have all of its planned features, we can't expect anyone to actually use this tool if nobody knows how to.
 
+## Build from source
+
+If the pre-built binaries doesn't work on your system, you can export the project by following the instructions on this repository: https://github.com/HungryProton/concept_graph_environment
+
+
+## Social medias
+
+Despite being a very new project, the ConceptGraph community is growing. Head over to the Discord server if you want to ask for help
+and hear about every little update or work in progress. Head over to Youtube or LBRY to access video tutorials.
+
++ **Discord server:** https://discord.gg/utUtB5r
++ **Twitter:** https://twitter.com/HungryProton
++ **Youtube:** https://www.youtube.com/channel/UCN-YuzlFmOOh0A5iwiDab2w
++ **LBRY:** https://lbry.tv/@HungryProton:2

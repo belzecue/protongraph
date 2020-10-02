@@ -3,6 +3,8 @@ extends Reference
 class_name ConceptGraphThreadPool
 
 """
+WARNING : Don't use this yet.
+
 An barebone thread pool specifically made for the ConceptGraph addon. There's no need for
 synchronization between threads, no parameters or no return data.
 """
@@ -22,7 +24,7 @@ var _queue_mutex := Mutex.new()
 func _init() -> void:
 	for i in _max_threads:
 		_available_threads.append(Thread.new())
-	connect("task_completed", self, "_on_task_completed")
+	Signals.safe_connect(self, "task_completed", self, "_on_task_completed")
 
 
 """

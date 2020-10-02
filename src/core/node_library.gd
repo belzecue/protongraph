@@ -1,4 +1,3 @@
-tool
 class_name ConceptNodeLibrary
 extends Node
 
@@ -8,6 +7,8 @@ This script parses the node folder to retrieve a list of all the available Conce
 
 
 var _nodes: Dictionary
+var _node_search_index: Dictionary
+
 
 func _exit_tree() -> void:
 	clear()
@@ -19,28 +20,32 @@ func get_list() -> Dictionary:
 	return _nodes
 
 
+func get_index_list() -> Dictionary:
+	if not _node_search_index:
+		refresh_list()
+	return _node_search_index
+
+
 func clear() -> void:
 	for node in _nodes.values():
 		node.queue_free()
 
 
 func create_node(type: String) -> ConceptNode:
+	if not _node_search_index:
+		refresh_list()
+
 	if _nodes.has(type):
-		return _nodes[type].duplicate()
+		return _nodes[type].duplicate(7)
+
 	return null
 
 
 func refresh_list() -> void:
+	_node_search_index = Dictionary()
 	clear()
 	_nodes = Dictionary()
-
-	# Current folder path points at the root project from here so we can't feed the Directory object
-	# with a relative path. Instead we get the script path and build an absolute path from there.
-	# Writing res://addons/concept_graph/src/nodes isn't an option because the end user can rename
-	# the plugin folder.
-	var script_path = get_script().get_path()
-	var nodes_dir = script_path.replace("node_library.gd", "") + "../nodes/"
-	_find_all_nodes(nodes_dir)
+	_find_all_nodes("res://src/nodes/")
 
 
 """
@@ -59,16 +64,25 @@ func _find_all_nodes(path) -> void:
 		if dir.current_is_dir():
 			_find_all_nodes(path_root + file)
 			continue
-		if not file.ends_with(".gd"):
+		if not file.ends_with(".gd") and not file.ends_with(".gdc"):
 			continue
 
 		var full_path = path_root + file
+		var script = load(full_path)
+		if not script or not script.can_instance():
+			print("Error: Failed to load script ", file)
+			continue
 
-		print("Loading ", name, " (", file, ")")
-		var node = load(full_path).new()
+		var node = script.new()
+		if not node is ConceptNode:
+			continue
+
+		if node.ignore:
+			node.queue_free()
+			continue
+
 		var name = node.display_name
 		var id = node.unique_id
-
 
 		# ConceptNode is abstract, don't add it to the list
 		if not (node is ConceptNode) or name == "ConceptNode":
@@ -82,4 +96,5 @@ func _find_all_nodes(path) -> void:
 			print("Warning: Node ", name, " has duplicate id ", full_path)
 		else:
 			_nodes[id] = node
+			_node_search_index[node.display_name] = id
 	dir.list_dir_end()
