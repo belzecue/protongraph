@@ -2,22 +2,23 @@ extends ProtonNode
 
 
 func _init() -> void:
-	unique_id = "rename_node"
-	display_name = "Rename Node"
+	type_id = "rename_node"
+	title = "Rename Node"
 	category = "Modifiers/Nodes"
-	description = "Takes a node and renames it"
+	description = "Renames a node."
 
-	set_input(0, "Node", DataType.NODE_3D)
-	set_input(1, "Name", DataType.STRING)
-	set_output(0, "", DataType.NODE_3D)
+	create_input("node", "Node", DataType.NODE_3D)
+	create_input("name", "Name", DataType.STRING)
+	create_output("out", "Renamed node", DataType.NODE_3D)
 
-	mirror_slots_type(0, 0)
+	enable_type_mirroring_on_slot("node", "out")
+
 
 func _generate_outputs() -> void:
-	var node:Node = get_input_single(0)
-	var name:String = get_input_single(1)
+	var node: Node = get_input_single("node", null)
+	var new_name: String = get_input_single("name", "")
 
-	if node and name:
-		node.name = name
+	if node:
+		node.name = new_name
 
-	output[0] = node
+	set_output("out", node)

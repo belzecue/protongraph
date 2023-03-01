@@ -1,60 +1,66 @@
 extends Node
 
+# Holds a list of recently opened files.
 
-var _history_path := "user://history.json"
-var _history: Array = []
+
+const HISTORY_PATH := "user://history.json"
+
+var _history: Array[String]
 var _initialized := false
 
 
 func _ready():
 	_load_or_create_file_history()
-	GlobalEventBus.register_listener(self, "template_loaded", "_on_template_loaded")
-	GlobalEventBus.register_listener(self, "remove_from_file_history", "_on_remove_from_history")
+	GlobalEventBus.graph_loaded.connect(_on_graph_loaded)
+	GlobalEventBus.graph_saved.connect(_on_graph_loaded)
+	GlobalEventBus.remove_from_file_history.connect(_on_remove_from_history)
 
 
-func get_list() -> Array:
+func get_list() -> Array[String]:
 	if not _initialized:
 		_load_or_create_file_history()
 	return _history
 
 
 func _load_or_create_file_history() -> void:
-	var dir = Directory.new()
-	dir.open("user://")
-	if dir.file_exists(_history_path):
-		_load_file_history()
-	else:
+	if not _load_file_history():
 		_save_file_history()
 	_initialized = true
 
 
-func _load_file_history() -> void:
-	var file = File.new()
-	file.open(_history_path, File.READ)
-	_history = JSON.parse(file.get_as_text()).result
+func _load_file_history() -> bool:
+	var file = ConfigFile.new()
+	var err = file.load(HISTORY_PATH)
+	if err != OK:
+		push_warning("Could not load recent file history. Code: ", err)
+		return false
+
+	_history = file.get_value("history", "list", []) as Array[String]
+	return true
 
 
 func _save_file_history() -> void:
-	var file = File.new()
-	file.open(_history_path, File.WRITE)
-	file.store_string(to_json(_history))
-	file.close()
+	var file = ConfigFile.new()
+	file.set_value("history", "list", _history)
+	file.save(HISTORY_PATH)
 
 
-func _on_template_loaded(path: String) -> void:
+func _on_graph_loaded(graph: NodeGraph) -> void:
+	var path = graph.save_file_path
+
 	if _history.has(path):
 		_history.erase(path)
 
 	_history.push_front(path)
-	if _history.size() > 20:
+	if _history.size() > 20: # TODO: Expose in user settings
 		_history.pop_back()
 
 	_save_file_history()
-	GlobalEventBus.dispatch("file_history_changed")
+	GlobalEventBus.file_history_changed.emit()
 
 
 func _on_remove_from_history(path: String) -> void:
 	if _history.has(path):
 		_history.erase(path)
 		_save_file_history()
-		GlobalEventBus.dispatch("file_history_changed")
+		GlobalEventBus.file_history_changed.emit()

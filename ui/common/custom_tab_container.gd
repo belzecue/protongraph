@@ -1,53 +1,44 @@
-extends TabContainer
 class_name CustomTabContainer
-
-
-# Same thing as a regular TabContainer, but this one uses a remote tab bar
-# placed elsewhere on the scene tree instead of using its own.
+extends TabContainer
 
 
 signal tab_closed
 signal tabs_cleared
 
 
-export var tabs: NodePath
+@export var tab_bar: NodePath
 
-var _tabs: Tabs
+var _tabs: TabBar
 
 
-func _ready() -> void:
-	tabs_visible = false
-	_tabs = get_node(tabs)
-	Signals.safe_connect(_tabs, "tab_changed", self, "_on_tab_changed")
-	Signals.safe_connect(_tabs, "tab_close", self, "_on_tab_close_request")
-	Signals.safe_connect(_tabs, "reposition_active_tab_request", self, "_on_tab_moved")
+func _ready():
+	_tabs = get_node_or_null(tab_bar)
+	if not _tabs:
+		return
+
+	_tabs.tab_changed.connect(_on_remote_tab_changed)
+	_tabs.tab_close_pressed.connect(_on_tab_close_pressed)
+	_tabs.active_tab_rearranged.connect(_on_tab_moved)
 
 	for c in get_children():
 		_tabs.add_tab(c.get_name())
 
 
-func add_tab(tab_content: Node, autoselect := true) -> void:
-	add_child(tab_content)
-	_tabs.add_tab(tab_content.get_name())
-	if autoselect:
-		_tabs.set_current_tab(get_child_count() - 1)
-
-
-func select_tab(tab: int) -> void:
-	_tabs.current_tab = tab
-
-
-func get_tab_content(tab_id: int) -> Node:
-	return get_child(tab_id)
-
-
-func get_current_tab_content() -> Node:
-	return get_tab_content(current_tab)
+func add_tab(view, set_current := true) -> void:
+	add_child(view, true)
+	_tabs.add_tab(view.get_name())
+	if set_current:
+		var tab_id = get_child_count() - 1
+		#set_current_tab()
+		_tabs.set_current_tab(tab_id)
 
 
 func close_tab(tab: int = -1) -> void:
 	if tab == -1:
 		tab = current_tab
+
+	if get_child_count() == 0:
+		return
 
 	var c = get_child(tab)
 	if not c:
@@ -57,23 +48,36 @@ func close_tab(tab: int = -1) -> void:
 	c.queue_free()
 	_tabs.remove_tab(tab)
 
-	var new_tab = _tabs.current_tab
-	if new_tab >= 0 and new_tab < get_tab_count():
-		current_tab = _tabs.current_tab
-
-	emit_signal("tab_closed")
+	tab_closed.emit()
 
 	if get_child_count() == 0:
-		emit_signal("tabs_cleared")
+		tabs_cleared.emit()
+	else:
+		current_tab = _tabs.current_tab
+
+
+func change_tab(tab: int) -> void:
+	current_tab = tab
+	_tabs.set_current_tab(tab)
+
+
+func set_tab_name(tab: int, new_name: String) -> void:
+	_tabs.set_tab_title(tab, new_name)
 
 
 func _on_tab_changed(tab: int) -> void:
+	_tabs.set_current_tab(tab)
+
+
+func _on_remote_tab_changed(tab: int) -> void:
 	set_current_tab(tab)
+	GlobalEventBus.current_view_changed.emit(get_child(tab))
 
 
 func _on_tab_moved(to_tab: int) -> void:
-	move_child(get_current_tab_content(), to_tab)
+	var child = get_child(current_tab)
+	move_child(child, to_tab)
 
 
-func _on_tab_close_request(tab: int) -> void:
+func _on_tab_close_pressed(tab: int) -> void:
 	close_tab(tab)

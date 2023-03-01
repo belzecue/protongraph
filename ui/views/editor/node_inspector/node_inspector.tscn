@@ -1,0 +1,142 @@
+[gd_scene load_steps=3 format=3 uid="uid://bftpwevjf4nhq"]
+
+[ext_resource type="Script" path="res://ui/views/editor/node_inspector/node_inspector.gd" id="1_be0h7"]
+[ext_resource type="Script" path="res://ui/views/editor/node_inspector/documentation/documentation_panel.gd" id="2_br1pm"]
+
+[node name="NodeInspector" type="Control"]
+clip_children = 1
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_be0h7")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="ScrollContainer"]
+clip_children = 1
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="DefaultContent" type="VBoxContainer" parent="ScrollContainer/MarginContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+alignment = 1
+
+[node name="InfoLabel" type="Label" parent="ScrollContainer/MarginContainer/DefaultContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+text = "Node inspector
+
+Select a node to display its local properties here. "
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="InfoLabel2" type="Label" parent="ScrollContainer/MarginContainer/DefaultContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 2
+theme_type_variation = &"LabelMinor"
+text = "(Hide this panel using the toolbar on the left)"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Properties" type="VBoxContainer" parent="ScrollContainer/MarginContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="ScrollContainer/MarginContainer/Properties"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "[Node name]"
+
+[node name="PanelContainer" type="PanelContainer" parent="ScrollContainer/MarginContainer/Properties"]
+layout_mode = 2
+theme_type_variation = &"PanelContainerHeader"
+
+[node name="InputsLabel" type="Label" parent="ScrollContainer/MarginContainer/Properties/PanelContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Inputs"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Inputs" type="VBoxContainer" parent="ScrollContainer/MarginContainer/Properties"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="PanelContainer2" type="PanelContainer" parent="ScrollContainer/MarginContainer/Properties"]
+layout_mode = 2
+theme_type_variation = &"PanelContainerHeader"
+
+[node name="OutputsLabel" type="Label" parent="ScrollContainer/MarginContainer/Properties/PanelContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Outputs"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Outputs" type="VBoxContainer" parent="ScrollContainer/MarginContainer/Properties"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="PanelContainer3" type="PanelContainer" parent="ScrollContainer/MarginContainer/Properties"]
+layout_mode = 2
+theme_type_variation = &"PanelContainerHeader"
+
+[node name="ExtrasLabel" type="Label" parent="ScrollContainer/MarginContainer/Properties/PanelContainer3"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Extras"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Extras" type="VBoxContainer" parent="ScrollContainer/MarginContainer/Properties"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="PanelContainer4" type="PanelContainer" parent="ScrollContainer/MarginContainer/Properties"]
+layout_mode = 2
+theme_type_variation = &"PanelContainerHeader"
+
+[node name="DocumentationLabel" type="Label" parent="ScrollContainer/MarginContainer/Properties/PanelContainer4"]
+layout_mode = 2
+text = "Documentation"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DocumentationPanel" type="RichTextLabel" parent="ScrollContainer/MarginContainer/Properties"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+script = ExtResource("2_br1pm")

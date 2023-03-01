@@ -1,36 +1,25 @@
-tool
 extends ProtonNode
 
 
 func _init() -> void:
-	unique_id = "conditional_bool"
-	display_name = "Condition (Boolean)"
+	type_id = "conditional_bool"
+	title = "Condition (Boolean)"
 	category = "Flow Control"
 	description = "Returns one of the two inputs based on the boolean value"
 
-	set_input(0, "True", DataType.ANY)
-	set_input(1, "False", DataType.ANY)
-	set_input(2, "Condition", DataType.BOOLEAN, {"value": true})
-	set_output(0, "", DataType.ANY)
-	
-	mirror_slots_type(0, 0)
+	create_input("true", "True", DataType.ANY)
+	create_input("false", "False", DataType.ANY)
+	create_input("condition", "Condition", DataType.BOOLEAN, SlotOptions.new(true))
+	create_output("out", "Output", DataType.ANY)
+
+	enable_type_mirroring_on_slot("true", "out")
+	#create_type_mirroring_group(["true", "false"], ["out"]) # TODO, implement in protonnode
 
 
 func _generate_outputs() -> void:
-	var condition: bool = get_input_single(2, true)
+	var condition: bool = get_input_single("condition", true)
 
 	if condition:
-		output[0] = get_input(0)
+		set_output("out", get_input("true"))
 	else:
-		output[0] = get_input(1)
-
-
-func _on_connection_changed():
-	._on_connection_changed()
-	cancel_type_mirroring(1, 0)
-	cancel_type_mirroring(0, 0)
-
-	if is_input_connected(0):
-		mirror_slots_type(0, 0)
-	elif is_input_connected(1):
-		mirror_slots_type(1, 0)
+		set_output("out", get_input("false"))

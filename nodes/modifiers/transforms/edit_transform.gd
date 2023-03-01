@@ -1,46 +1,32 @@
-tool
 extends ProtonNode
 
 
 func _init() -> void:
-	unique_id = "edit_transform"
-	display_name = "Edit Transforms"
+	type_id = "edit_transform"
+	title = "Edit Transform"
 	category = "Modifiers/Transforms"
-	description = "Edit the position, rotation or scale of a set of nodes"
+	description = "Edit the instances position / rotation / scale"
 
-	set_input(0, "Nodes", DataType.NODE_3D)
-	set_input(1, "Position", DataType.VECTOR3)
-	set_input(2, "Rotation", DataType.VECTOR3)
-	set_input(3, "Scale", DataType.VECTOR3)
-	set_output(0, "", DataType.NODE_3D)
+	var opts := SlotOptions.new()
+	opts.allow_multiple_connections = true
+	create_input("in", "Instances", DataType.NODE_3D, opts)
+	create_input("position", "Position", DataType.VECTOR3)
+	create_input("rotation", "Rotation", DataType.VECTOR3)
+	create_input("scale", "Scale", DataType.VECTOR3, SlotOptions.new(Vector3.ONE))
+	create_output("out", "Instances", DataType.NODE_3D)
 
-	mirror_slots_type(0, 0)
+	enable_type_mirroring_on_slot("in", "out")
 
 
 func _generate_outputs() -> void:
-	var nodes := get_input(0)
-	var position = get_input_single(1, null)
-	var rotation = get_input_single(2, null)
-	var scale = get_input_single(3, null)
+	var nodes: Array = get_input("in")
+	var position: Vector3 = get_input_single("position", Vector3.ZERO)
+	var rotation: Vector3 = get_input_single("rotation", Vector3.ZERO)
+	var scale: Vector3 = get_input_single("scale", Vector3.ONE)
 
-	if not nodes or nodes.size() == 0:
-		return
+	for n in nodes as Array[Node3D]:
+		n.transform.origin = position
+		n.rotation_degrees = rotation
+		n.scale = scale
 
-	if not nodes[0] is Spatial:
-		return
-
-	if not position and not rotation and not scale:
-		output[0] = nodes
-		return
-
-	for n in nodes:
-		if position:
-			n.transform.origin = position
-
-		if rotation:
-			n.rotation = rotation
-
-		if scale:
-			n.scale = scale
-
-	output[0] = nodes
+	set_output("out", nodes)

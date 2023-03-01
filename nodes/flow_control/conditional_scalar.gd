@@ -1,46 +1,31 @@
-tool
 extends ProtonNode
 
 
 func _init() -> void:
-	unique_id = "conditional_scalar"
-	display_name = "Condition (Numbers)"
+	type_id = "conditional_scalar"
+	title = "Condition (Numbers)"
 	category = "Flow Control"
 	description = "Compare two numbers and returns one of the three inputs"
 
-	set_input(0, "A > B", DataType.ANY)
-	set_input(1, "A == B", DataType.ANY)
-	set_input(2, "A < B", DataType.ANY)
-	set_input(3, "A", DataType.SCALAR, {"allow_lesser": true})
-	set_input(4, "B", DataType.SCALAR, {"allow_lesser": true})
-	set_output(0, "", DataType.ANY)
-	
-	mirror_slots_type(0, 0)
+	create_input("greater", "A > B", DataType.ANY)
+	create_input("equal", "A == B", DataType.ANY)
+	create_input("lesser", "A < B", DataType.ANY)
+	create_input("a", "A", DataType.NUMBER)
+	create_input("b", "B", DataType.NUMBER)
+
+	create_output("out", "Output", DataType.ANY)
+
+	enable_type_mirroring_on_slot("a", "out")
+	#create_type_mirroring_group(["a", "b"], ["out"]) # TODO, implement in protonnode
 
 
 func _generate_outputs() -> void:
-	var a: float = get_input_single(3, 0)
-	var b: float = get_input_single(4, 0)
+	var a: float = get_input_single("a", 0)
+	var b: float = get_input_single("b", 0)
 
 	if a > b:
-		output[0] = get_input(0)
+		set_output("out", get_input("greater"))
 	elif a == b:
-		output[0] = get_input(1)
+		set_output("out", get_input("equal"))
 	elif a < b:
-		output[0] = get_input(2)
-
-
-# TODO : Make this generic and move it to the base class
-func _on_connection_changed():
-	._on_connection_changed()
-
-	cancel_type_mirroring(0, 0)
-	cancel_type_mirroring(1, 0)
-	cancel_type_mirroring(2, 0)
-
-	if is_input_connected(0):
-		mirror_slots_type(0, 0)
-	elif is_input_connected(1):
-		mirror_slots_type(1, 0)
-	elif is_input_connected(2):
-		mirror_slots_type(2, 0)
+		set_output("out", get_input("lesser"))

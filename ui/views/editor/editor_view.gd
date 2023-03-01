@@ -1,155 +1,140 @@
-extends Control
 class_name EditorView
+extends Control
 
-# Displays a graph editor, a viewport and an inspector.
-# It handles autosaves and the communication between the different parts of
-# this view.
+# The main view user will interact with. Displays a graph editor in the middle,
+# a 3D viewport below, and an Inspector and Node panel on the sides.
+#
+# This script is the glue code between all these parts. Their actual logic is
+# performed in their own scenes.
 
 
-signal template_saved
+var _graph: NodeGraph
 
-
-export var viewport_container: NodePath
-export var template: NodePath
-export var add_node_dialog: NodePath
-export var inspector: NodePath
-
-var _node_dialog: WindowDialog
-var _template: Template
-var _save_timer: Timer
-var _last_position: Vector2
-var _template_path: String
-var _viewport: EditorViewport
-var _inspector: InspectorPanel
-var _saved := false
-var _updating_inspector := false
+@onready var _toolbar: Toolbar = $%Toolbar
+@onready var _graph_editor_root: Control = $%NodeGraphRoot
+@onready var _graph_editor: NodeGraphEditor = $%NodeGraphEditor
+@onready var _viewport_root: Control = $%ViewportRoot
+@onready var _viewport: EditorViewport = $%Viewport
+@onready var _node_inspector: NodeInspector = $%NodeInspector
+@onready var _graph_inspector: GraphInspector = $%GraphInspector
 
 
 func _ready() -> void:
-	_template = get_node(template)
-	_node_dialog = get_node(add_node_dialog)
-	_viewport = get_node(viewport_container)
-	_inspector = get_node(inspector)
-	_template.inspector = _inspector
-	
-	Signals.safe_connect(self, "template_saved", self, "_on_template_saved")
-	GlobalEventBus.register_listener(self, "settings_updated", "_on_settings_updated")
-	_on_settings_updated(Settings.AUTOSAVE_ENABLED)
+	visibility_changed.connect(_on_visibility_changed)
+
+	_graph_editor.node_selected.connect(_on_node_selected)
+	_graph_editor.node_deselected.connect(_on_node_deselected)
+	_graph_editor.node_deleted.connect(_on_node_deleted)
+	_toolbar.save_graph.connect(_on_save_button_pressed)
+	_toolbar.toggle_node_inspector.connect(_toggle_panel.bind(_node_inspector))
+	_toolbar.toggle_graph_inspector.connect(_toggle_panel.bind(_graph_inspector))
+	_toolbar.toggle_graph_editor.connect(_toggle_panel.bind(_graph_editor_root))
+	_toolbar.toggle_viewport.connect(_toggle_panel.bind(_viewport_root))
+	_node_inspector.pinned_variables_changed.connect(_on_pinned_variables_changed)
+
+	WindowManager.window_created.connect(_on_window_changed)
+	WindowManager.window_closed.connect(_on_window_changed)
+
+	_on_window_changed("viewport")
+	_on_window_changed("graph_editor")
 
 
-func load_template(path: String) -> void:
-	_template_path = path
-	_template.load_from_file(path)
-	_template.generate()
-	_saved = true
+func edit(graph: NodeGraph) -> void:
+	_graph = graph
+	_graph_editor.set_node_graph(graph)
+	_graph_inspector.set_graph_editor(_graph_editor)
+	_toolbar.rebuild.connect(rebuild)
+	_graph.graph_changed.connect(rebuild)
+	rebuild.call_deferred()
 
 
-func save_template() -> void:
-	_template.save_to_file(_template_path)
-	yield(_template, "template_saved")
-	_saved = true
-	emit_signal("template_saved")
-	print("Saved template ", _template_path)
+# Returns true to close the view
+# Returns false to continue editing
+func save_and_close() -> bool:
+	if not has_pending_changes():
+		return true
+
+	GlobalEventBus.save_graph.emit(_graph, true)
+
+	var status = await GlobalEventBus.save_status_updated
+
+	match status:
+		"saved", "discarded":
+			return true
+		"canceled", _:
+			return false
 
 
-func save_template_as(path: String) -> void:
-	var old = _template_path
-	_template_path = path
-	save_template()
-	yield(_template, "template_saved")
-	_template_path = old
+func rebuild() -> void:
+	_viewport.clear()
+	_graph.rebuild(true)
 
 
-func get_input(_name) -> Node:
-	return null
+func get_edited_graph() -> NodeGraph:
+	return _graph
 
 
-func regenerate(clear_cache := true) -> void:
-	_template.generate(clear_cache)
+func get_edited_file_path() -> String:
+	return _graph.save_file_path if _graph else ""
 
 
 func has_pending_changes() -> bool:
-	return not _saved
+	return _graph.pending_changes
 
 
-func _show_node_dialog_centered() -> void:
-	_show_node_dialog(_template.rect_size / 2.0)
+func _toggle_panel(panel: Control) -> void:
+	panel.visible = not panel.visible
 
 
-func _show_node_dialog(position: Vector2) -> void:
-	_last_position = position
-	_node_dialog.set_global_position(position)
-	_node_dialog.popup()
+func _on_node_selected(node: ProtonNodeUi) -> void:
+	_node_inspector.display_node(node)
 
 
-# warning-ignore:return_value_discarded
-func _on_create_node_request(type: String) -> void:
-	var local_pos = _last_position - _template.get_global_transform().origin + _template.scroll_offset
-	_template.create_node(type, {"offset": local_pos})
+func _on_node_deselected(_node: ProtonNodeUi) -> void:
+	_node_inspector.clear()
 
 
-func _on_graph_changed() -> void:
-	_saved = false
+func _on_node_deleted(deleted_node: ProtonNodeUi) -> void:
+	if _node_inspector.get_selected() == deleted_node:
+		_node_inspector.clear()
 
 
-func _on_build_completed() -> void:
-	var result = _template.get_output()
-	_viewport.display(result)
+func _on_save_button_pressed() -> void:
+	GlobalEventBus.save_graph.emit(_graph)
 
 
-func _on_build_outdated() -> void:
-	_template.generate(false)
+func _on_pinned_variables_changed() -> void:
+	_graph_inspector.rebuild_ui()
 
 
-func _on_exposed_variables_updated(variables: Array) -> void:
-	_updating_inspector = true
-	_inspector.update_variables(variables)
-	_updating_inspector = false
+# Match the visibility of the components that can be moved to sub windows to
+# make sure they are not visible if their parent editor view is not the
+# current focused tab.
+func _on_visibility_changed() -> void:
+	_graph_editor.visible = visible
+	_viewport.visible = visible
 
 
-func _on_inspector_value_changed(name: String) -> void:
-	if not _updating_inspector:
-		_template.notify_exposed_variable_change(name)
+# Some panels (like the viewport or the graph editor) can be displayed in an
+# external window. This method ensure they are displayed in the right place.
+func _on_window_changed(id: String) -> void:
+	var panel: Control
+	var default_root: Control
 
+	match id:
+		"viewport":
+			panel = _viewport
+			default_root = _viewport_root
 
-func _on_input_created(node: Spatial) -> void:
-	_viewport.add_input_node(node)
+		"graph_editor":
+			panel = _graph_editor
+			default_root = _graph_editor_root
 
+	if WindowManager.has_window(id):
+		WindowManager.add_control_to(id, panel)
+	else:
+		NodeUtil.set_parent(panel, default_root)
 
-func _on_input_deleted(node: Spatial) -> void:
-	_viewport.remove_input_node(node)
-
-
-# Called when the user changes parameters in the settings panel.
-func _on_settings_updated(setting: String) -> void:
-	var enabled = Settings.get_setting(Settings.AUTOSAVE_ENABLED)
-	var interval = Settings.get_setting(Settings.AUTOSAVE_INTERVAL)
-	
-	# Autosave delay was changed
-	if setting == Settings.AUTOSAVE_INTERVAL and _save_timer:
-		_save_timer.start(interval)
-		return
-	
-	if setting == Settings.AUTOSAVE_ENABLED:
-		# Autosave was enabled
-		if enabled and not _save_timer:
-			_save_timer = Timer.new()
-			_save_timer.one_shot = true
-			_save_timer.autostart = false
-			Signals.safe_connect(_save_timer, "timeout", self, "save_template")
-			add_child(_save_timer)
-			_save_timer.start(interval)
-			return
-			
-		# Autosave was disabled
-		if not enabled and _save_timer:
-			_save_timer.stop()
-			_save_timer.queue_free()
-			_save_timer = null
-			return
-
-
-# Reset the autosave timer when the template is saved.
-func _on_template_saved() -> void:
-	if _save_timer:
-		_save_timer.start()
+	# Hide the roots if their children have moved to an external window.
+	for root in [_graph_editor_root, _viewport_root]:
+		root.visible = root.get_child_count() > 0

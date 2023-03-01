@@ -1,30 +1,29 @@
-tool
 extends ProtonNode
 
 
 func _init() -> void:
-	unique_id = "break_transform"
-	display_name = "Break Transform"
+	type_id = "break_transform"
+	title = "Break Transform"
 	category = "Generators/Vectors"
-	description = "Expose position, rotation and scale from a node 3D"
+	description = "Expose position, rotation and scale from a 3D object"
 
-	set_input(0, "Node", DataType.NODE_3D)
-	set_output(0, "Position", DataType.VECTOR3)
-	set_output(1, "Rotation", DataType.VECTOR3)
-	set_output(2, "Scale", DataType.VECTOR3)
+	create_input("in", "3D object", DataType.NODE_3D)
+	create_output("pos", "Position", DataType.VECTOR3)
+	create_output("rot", "Rotation", DataType.VECTOR3)
+	create_output("scale", "Scale", DataType.VECTOR3)
 
 
 func _generate_outputs() -> void:
-	var node: Spatial = get_input_single(0)
+	var node: Node3D = get_input_single("in", null)
 
 	if not node:
 		return
 
 	var rotation = Vector3.ZERO
-	rotation.x = rad2deg(node.rotation.x)
-	rotation.y = rad2deg(node.rotation.y)
-	rotation.z = rad2deg(node.rotation.z)
+	rotation.x = rad_to_deg(node.rotation.x)
+	rotation.y = rad_to_deg(node.rotation.y)
+	rotation.z = rad_to_deg(node.rotation.z)
 
-	output[0] = node.translation
-	output[1] = rotation
-	output[2] = node.scale
+	set_output("pos", node.translation)
+	set_output("rot", rotation)
+	set_output("scale", node.scale)

@@ -1,58 +1,68 @@
-tool
 extends ProtonNode
 
-"""
-Generates a list of transforms aligned to a grid in a 3D volume
-"""
+
+const MIN_SPACING := 0.01
 
 
 func _init() -> void:
-	unique_id = "create_point_grid"
-	display_name = "Create Point Grid"
+	type_id = "create_point_grid"
+	title = "Create Point Grid"
 	category = "Generators/Transforms"
 	description = "Generates a list of transforms aligned to a grid in a 3D volume"
 
-	set_input(0, "Size", DataType.VECTOR3)
-	set_input(1, "Center", DataType.VECTOR3)
-	set_input(2, "Density", DataType.SCALAR, {"step": 0.001, "exp": false})
-	set_input(3, "Fixed density", DataType.BOOLEAN)
-	set_input(4, "Align with", DataType.NODE_3D)
-	set_input(5, "Align rotation", DataType.BOOLEAN)
-	set_output(0, "Transforms", DataType.NODE_3D)
+	create_input("grid_size", "Size", DataType.VECTOR3, SlotOptions.new(Vector3.ONE * 5.0))
+	create_input("origin", "Origin", DataType.VECTOR3)
+
+	var opts := SlotOptions.new()
+	opts.min_value = MIN_SPACING
+	opts.allow_lesser = false
+	opts.value = Vector3.ONE
+	create_input("spacing", "Spacing", DataType.VECTOR3, opts)
+	create_input("reference_frame", "Reference frame", DataType.NODE_3D)
+	create_input("align_rotation", "Align rotation", DataType.BOOLEAN)
+
+	create_output("points", "Points", DataType.NODE_3D)
 
 
 func _generate_outputs() -> void:
-	var size: Vector3 = get_input_single(0, Vector3.ONE)
-	var center: Vector3 = get_input_single(1, Vector3.ZERO)
-	var density: float = get_input_single(2, 1.0)
-	var fixed_density: bool = get_input_single(3, false)
-	var reference: Spatial = get_input_single(4)
-	var align_rot: bool = get_input_single(5, false)
+	var size: Vector3 = get_input_single("grid_size", Vector3.ONE)
+	var origin: Vector3 = get_input_single("origin", Vector3.ZERO)
+	var align_rotation: bool = get_input_single("align_rotation", false)
 
-	var steps := Vector3.ONE
-	steps.x += floor(size.x * density)
-	steps.y += floor(size.y * density)
-	steps.z += floor(size.z * density)
+	var spacing: Vector3 = get_input_single("spacing", Vector3.ONE)
+	spacing = VectorUtil.max_f(spacing, MIN_SPACING)
 
-	var offset := Vector3.ONE / density
-	if not fixed_density:
-		offset.x = size.x / max(1.0, steps.x - 1.0)
-		offset.y = size.y / max(1.0, steps.y - 1.0)
-		offset.z = size.z / max(1.0, steps.z - 1.0)
+	var reference_frame: Node3D = get_input_single("reference_frame", Node3D.new())
+	var gt: Transform3D = reference_frame.transform
 
-	for i in range(steps.x):
-		for j in range(steps.y):
-			for k in range(steps.z):
-				var p = Position3D.new()
-				p.transform.origin.x = offset.x * i
-				p.transform.origin.y = offset.y * j
-				p.transform.origin.z = offset.z * k
-				p.transform.origin += ((size) / -2.0)
+	var half_size := size * 0.5
+	var start_corner := origin - half_size
 
-				if reference:
-					p.transform.origin = reference.transform.xform(p.transform.origin)
-					if align_rot:
-						p.transform.basis = reference.transform.basis
-				else:
-					p.transform.origin += center
-				output[0].push_back(p)
+	var width := int(ceil(size.x / spacing.x))
+	var height := int(ceil(size.y / spacing.y))
+	var length := int(ceil(size.z / spacing.z))
+
+	height = max(1, height) # Make sure height never gets below 1 or else nothing happens
+
+	var grid: Array[Node3D] = []
+	var node: Node3D
+	var pos: Vector3
+
+	for i in width * length:
+		for j in height:
+			node = Node3D.new()
+			pos = Vector3.ZERO
+			pos.x = (i % width) * spacing.x
+			pos.y = (j * spacing.y)
+			@warning_ignore("integer_division")
+			pos.z = (i / width) * spacing.z
+			pos += start_corner
+
+			if align_rotation:
+				node.transform.basis = gt.basis
+
+			node.transform.origin = gt * pos
+			grid.push_back(node)
+
+	set_output("points", grid)
+

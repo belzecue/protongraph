@@ -1,44 +1,45 @@
-tool
 extends ProtonNode
 
 
 func _init() -> void:
-	unique_id = "l_system_rules"
-	display_name = "L-System Rules"
-	category = "Generators/String"
+	type_id = "l_system_rules"
+	title = "L-System Rules"
+	category = "Generators/Strings"
 	description = "Returns a list of strings with support for variables"
 
-	var opts = {
-		"min": 0,
-		"max":  360,
-		"allow_lesser": true,
-		"allow_higher": true
-	}
-	set_input(0, "Rules", DataType.STRING)
-	set_input(1, "a", DataType.SCALAR, opts)
-	set_input(2, "b", DataType.SCALAR, opts)
-	set_input(3, "c", DataType.SCALAR, opts)
-	set_input(4, "d", DataType.SCALAR, opts)
-	set_input(5, "e", DataType.SCALAR, opts)
-	
-	set_output(0, "", DataType.STRING)
+	var opts := SlotOptions.new()
+	opts.allow_multiple_connections = true
+	create_input("rules", "Rules", DataType.STRING, opts)
 
-	enable_multiple_connections_on_slot(0)
-	
+	opts = SlotOptions.new()
+	opts.min_value = 0
+	opts.max_value = 360
+	opts.allow_lesser = false
+	opts.allow_greater = false
+	create_input("a", "a", DataType.NUMBER, opts)
+	create_input("b", "b", DataType.NUMBER, opts)
+	create_input("c", "c", DataType.NUMBER, opts)
+	create_input("d", "d", DataType.NUMBER, opts)
+	create_input("e", "e", DataType.NUMBER, opts)
+
+	create_output("out", "", DataType.STRING)
+
 
 func _generate_outputs() -> void:
-	var rules := get_input(0)
-	var a: String = String(get_input_single(1, 0.0))
-	var b: String = String(get_input_single(2, 0.0))
-	var c: String = String(get_input_single(3, 0.0))
-	var d: String = String(get_input_single(4, 0.0))
-	var e: String = String(get_input_single(5, 0.0))
-	
+	var rules = get_input("rules")
+	var a := var_to_str(get_input_single("a", 0.0))
+	var b := var_to_str(get_input_single("b", 0.0))
+	var c := var_to_str(get_input_single("c", 0.0))
+	var d := var_to_str(get_input_single("d", 0.0))
+	var e := var_to_str(get_input_single("e", 0.0))
+
 	for i in rules.size():
-		rules[i] = rules[i].replace("a", a)
-		rules[i] = rules[i].replace("b", b)
-		rules[i] = rules[i].replace("c", c)
-		rules[i] = rules[i].replace("d", d)
-		rules[i] = rules[i].replace("e", e)
-	
-	output[0] = rules
+		var rule: String = rules[i]
+		rule = rule.replace("a", a)
+		rule = rule.replace("b", b)
+		rule = rule.replace("c", c)
+		rule = rule.replace("d", d)
+		rule = rule.replace("e", e)
+		rules[i] = rule
+
+	set_output("out", rules)

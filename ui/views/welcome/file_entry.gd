@@ -1,23 +1,26 @@
 extends Button
 class_name HistoryFileEntry
 
+
 var _path
 
-onready var _label_name: Label = $MarginContainer/VBoxContainer/HBoxContainer/Name
-onready var _label_path: Label = $MarginContainer/VBoxContainer/Path
-onready var _close_button: Button = $MarginContainer/VBoxContainer/HBoxContainer/CloseButton
-onready var _margin_container: MarginContainer = $MarginContainer
+@onready var _label_name: Label = $%FileNameLabel
+@onready var _label_path: Label = $%FilePathLabel
+@onready var _close_button: Button = $%CloseButton
+@onready var _margin_container: MarginContainer = $%MarginContainer
 
 
 func _ready():
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
+	pressed.connect(_on_pressed)
+
+	_close_button.pressed.connect(_on_close_button_pressed)
+	_close_button.visible = false
+
 	# Workaround because button isn't a container so it doesn't scale to fit
 	# its children automatically.
-	rect_min_size.y = _margin_container.rect_size.y
-
-	Signals.safe_connect(self, "mouse_entered", self, "_on_mouse_entered")
-	Signals.safe_connect(self, "mouse_exited", self, "_on_mouse_exited")
-	Signals.safe_connect(self, "pressed", self, "_on_pressed")
-	Signals.safe_connect(_close_button, "pressed", self, "_on_close_button_pressed")
+	custom_minimum_size.y = _margin_container.size.y
 
 
 func set_path(path: String) -> void:
@@ -27,13 +30,14 @@ func set_path(path: String) -> void:
 
 
 func _shorten_path(path: String) -> String:
-	if path.length() < 80:
+	var max_path_length := 120
+	if path.length() < max_path_length:
 		return path
 
 	var tokens = path.split("/", false)
 	var total_size = path.length()
 
-	while total_size > 80 and tokens.size() > 4:
+	while total_size > max_path_length and tokens.size() > 3:
 		tokens.remove(2)
 		total_size = tokens.size()
 		for token in tokens:
@@ -56,8 +60,8 @@ func _on_mouse_exited():
 
 
 func _on_pressed() -> void:
-	GlobalEventBus.dispatch("load_template", _path)
+	GlobalEventBus.load_graph.emit(_path)
 
 
 func _on_close_button_pressed() -> void:
-	GlobalEventBus.dispatch("remove_from_file_history", _path)
+	GlobalEventBus.remove_from_file_history.emit(_path)

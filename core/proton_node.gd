@@ -1,106 +1,124 @@
-extends ProtonNodeUi
 class_name ProtonNode
+extends Resource
 
 
-signal cache_cleared
-signal output_ready
+signal local_value_changed(idx, value)
+signal layout_changed
 
 
-var unique_id: String
+var external_data: Dictionary
+var unique_name: String
+var type_id: String
+var title: String
 var description: String
+var category: String
+var documentation := DocumentationData.new()
 var ignore := false
-var doc := NodeDocumentation.new()
-var node_pool: NodePool # Injected from template
-var thread_pool: ThreadPool # Injected from template
-var output := {}
-var debug_mode := false
+var leaf_node := false
+var graph: NodeGraph
 
-var _docs: Dictionary
-var _generation_requested := false # True after calling prepare_output once
-var _output_ready := false # True when the background generation was completed
+# Dictionary format: { idx : ProtonNodeSlot }
+var inputs: Dictionary
+var outputs: Dictionary
+var extras: Dictionary
 
 
-func _enter_tree() -> void:
-	._enter_tree()
-	_reset_output()
-	Signals.safe_connect(self, "gui_value_changed", self, "_on_value_changed")
+func create_input(idx: String, name: String, type: int, options := SlotOptions.new()) -> void:
+	if not _slot_creation_check(idx, inputs):
+		return
+
+	var input = ProtonNodeSlot.new()
+	input.name = name
+	input.type = type
+	input.original_type = type
+	input.local_value = null
+	input.options = options
+	inputs[idx] = input
 
 
-# Because we're saving the tree to a json file, we need each node to explicitely
-# specify the data to save. It's also the node responsability to restore it
-# when we load the file. Most nodes won't need this but it could be useful for
-# nodes that allows the user to type in raw values directly if nothing is
-# connected to a slot.
+func create_output(idx: String, name: String, type: int, options := SlotOptions.new()) -> void:
+	if not _slot_creation_check(idx, outputs):
+		return
+
+	var output = ProtonNodeSlot.new()
+	output.name = name
+	output.type = type
+	output.original_type = type
+	output.options = options
+	outputs[idx] = output
+
+
+func create_extra(idx: String, name: String, type: int, options := SlotOptions.new()) -> void:
+	if not _slot_creation_check(idx, extras):
+		return
+
+	var extra = ProtonNodeSlot.new()
+	extra.name = name
+	extra.type = type
+	extra.options = options
+	extras[idx] = extra
+
+
+# Override in child class
 func export_custom_data() -> Dictionary:
 	return {}
 
 
-# This method get exactly what it exported from the export_custom_data method.
-# Use it to manually restore the previous node state.
 func restore_custom_data(_data: Dictionary) -> void:
 	pass
 
 
-# Override this method when exposing a variable to the inspector. It's up to
-# you to decide what to do with the user defined value.
-func set_value_from_inspector(_name: String, _value) -> void:
-	pass
+# Automatically change the output type to mirror the type of what's
+# connected to the input slot
+func enable_type_mirroring_on_slot(input_idx, output_idx) -> void:
+	if input_idx in inputs and output_idx in outputs:
+		var output_slot: ProtonNodeSlot = outputs[output_idx]
+		output_slot.mirror_type_from = input_idx
+
+		var input_slot: ProtonNodeSlot = inputs[input_idx]
+		input_slot.mirror_type_to.push_back(output_idx)
 
 
-func register_to_garbage_collection(resource):
-	get_parent().register_to_garbage_collection(resource)
+func disable_type_mirroring_on_slot(output_idx) -> void:
+	if output_idx in outputs:
+		var output_slot: ProtonNodeSlot = outputs[output_idx]
+		var input_idx: String = output_slot.mirror_type_from
+		output_slot.mirror_type_from = ""
+		output_slot.type = output_slot.original_type
+
+		var input_slot: ProtonNodeSlot = inputs[input_idx]
+		input_slot.mirror_type_to.erase(output_idx)
+		if input_slot.mirror_type_to.is_empty():
+			input_slot.type = input_slot.original_type
 
 
-# Clears the cache and the cache of every single nodes right to this one.
-func reset() -> void:
-	clear_cache()
-	if get_parent():
-		for node in get_parent().get_all_right_nodes(self):
-			node.reset()
-
-	if is_final_output_node():
-		emit_signal("node_changed", self, true)
+func set_local_value(idx: String, value: Variant) -> void:
+	if idx in inputs:
+		inputs[idx].local_value = value
+		changed.emit()
+		local_value_changed.emit(idx, value)
 
 
-func clear_cache() -> void:
-	_clear_cache()
-	_reset_output()
-	_output_ready = false
-	emit_signal("cache_cleared")
+func get_local_value(idx: String) -> Variant:
+	if idx in inputs:
+		return inputs[idx].local_value
+	return null
 
 
-# Returns the associated data to the given slot index. It either comes from a
+# Returns the associated data to the given input index. It either comes from a
 # connected input node, or from a local control field in the case of a simple
 # type (float, string)
-func get_input(idx: int, default = []) -> Array:
-	var parent = get_parent()
-	if not parent:
-		return default
+func get_input(idx: String, default = []):
+	if not idx in inputs:
+		push_error("Error in ", type_id, ", Input ", idx, " was not defined")
+		return []
 
-	var pos = get_input_index_pos(idx)
-	var inputs: Array = parent.get_left_nodes(self, pos)
-	if inputs.size() > 0: # Input source connected, ignore local data
-		var res = []
-		for input in inputs:
-			var input_node = input["node"]
-			var output_index = input_node.get_output_index_at(input["slot"])
-			var node_output = input["node"].get_output(output_index, default)
-			if node_output is Array:
-				res += node_output
-			else:
-				res.push_back(node_output)
-		return res
+	# Check if connected nodes on this input provided something.
+	if inputs[idx].computed_value_ready:
+		return inputs[idx].computed_value
 
-	# If no source is connected but the node has a custom gui
-	if has_custom_gui():
-		var node_output = _get_input(idx)
-		if node_output == null:
-			return default
-		return node_output
-
-	# If no source is connected but the node has a gui component attached where
-	# the user can enter a local value
-	var local_value = _get_default_gui_value(idx)
+	# If no source is connected check the local value provided by the slot gui
+	var local_value = get_local_value(idx)
 	if local_value != null:
 		return [local_value]
 
@@ -109,138 +127,99 @@ func get_input(idx: int, default = []) -> Array:
 
 # By default, every input and output is an array. This is just a short hand with
 # all the necessary checks that returns the first value of the input.
-func get_input_single(idx: int, default = null):
-	var input = get_input(idx)
-	if input == null or input.size() == 0 or input[0] == null:
+func get_input_single(idx: String, default = null):
+	var input: Array = get_input(idx)
+	if input.is_empty() or input[0] == null:
 		return default
 	return input[0]
 
 
-# Returns what the node generates for a given slot
-# This method ensure the output is not calculated more than one time per run.
-# It's useful if the output node is connected to more than one node. It ensure
-# the results are the same and save some performance
-func get_output(idx: int, default := []) -> Array:
-	if not is_output_ready():
-		if debug_mode:
-			_debug_generate_outputs()
-		else:
-			_generate_outputs()
-		_output_ready = true
-		emit_signal("output_ready")
+# Called from the parent graph when  passing values from previous
+# nodes to this one.
+func set_input(idx: String, value) -> void:
+	if not idx in inputs:
+		push_error("Invalid index: ", idx, " was not found in inputs")
+		return
 
-	if not output.has(idx):
-		return default
+	if not value is Array:
+		value = [value]
 
-	var res = output[idx]
-	if not res is Array:
-		res = [res]
-	if res.size() == 0:
-		return default
+	# Append the value to the existing one in case multiple nodes are connected
+	# to this same input.
+	inputs[idx].computed_value.append_array(value)
+	inputs[idx].computed_value_ready = true
 
-	# If the output is a node array, we need to duplicate them first otherwise they get passed as
-	# references which causes issues when the same output is sent to two different nodes.
-	if res[0] is Object and res[0].has_method("duplicate"):
-		var duplicates = []
-		for i in res.size():
-			# TODO move the duplication in a helper function instead
-			var node = res[i]
-			var duplicate
-			if node is Resource:
-				duplicate = node.duplicate(true)
-			else:
-				duplicate = node.duplicate(7)
-
-			# TODO : Check if other nodes needs extra steps
-			if node is Path or node is Path2D:
-				duplicate.curve = node.curve.duplicate(true)
-
-			# Outputs from final nodes are the responsibility of the ProtonGraph node
-			if not is_final_output_node():
-				register_to_garbage_collection(duplicate)
-
-			duplicates.push_back(duplicate)
-		return duplicates
-
-	# If it's not a node array, it either contains built in types or nested arrays.
-	# Arrays are passed as reference so return a deep copy
-	return res.duplicate(true)
+	# Outputs are no longer valid, reset them.
+	for o_idx in outputs:
+		outputs[o_idx].computed_value = []
+		outputs[o_idx].computed_value_ready = false
 
 
-func get_output_single(idx: int, default = null):
-	var res = get_output(idx)
-	if res == null or res.size() == 0 or res[0] == null:
-		return default
-	return res[0]
+# Called from the custom nodes when generating values.
+func set_output(idx: String, value) -> void:
+	if not idx in outputs:
+		push_error("Invalid index: ", idx, " was not found in outputs")
+		return
+
+	if not value is Array:
+		value = [value]
+
+	outputs[idx].computed_value = value
+	outputs[idx].computed_value_ready = true
 
 
-# Return the variables exposed to the node inspector. Same format as
-# get_property_list [ {name: , type: }, ... ]
-func get_exposed_variables() -> Array:
-	return []
+func clear_values() -> void:
+	for idx in inputs:
+		inputs[idx].computed_value = []
+		inputs[idx].computed_value_ready = false
+
+	for idx in outputs:
+		outputs[idx].computed_value = []
+		outputs[idx].computed_value_ready = false
 
 
-func get_remote_input(name: String):
-	if get_parent():
-		return get_parent().get_remote_input(name)
-	return null
+# Check if an output has been computed.
+# If no specific idx is provided, returns true if every output have been computed,
+# false overwise.
+func is_output_ready(idx: String = "") -> bool:
+	if outputs.is_empty():
+		return false
+
+	if idx.is_empty(): # No index provided, check them all
+		for i in outputs:
+			if not outputs[i].computed_value_ready:
+				return false
+		return true
+
+	if not idx in outputs:
+		return false
+
+	return outputs[idx].computed_value_ready
 
 
-func is_output_ready() -> bool:
-	return _output_ready
+func _slot_creation_check(idx: String, map: Dictionary) -> bool:
+	if idx.is_empty():
+		push_error("Cannot create slot with an empty id.")
+		return false
 
+	if idx in map:
+		push_error("Slot id ", idx, " already exists, aborting.")
+		return false
 
-# Override this function to return true if the node marks the end of a graphnode
-func is_final_output_node() -> bool:
-	return false
-
-
-# Override this function to return true if the outputs of the node should be
-# sent to external applications.
-func is_remote_sync_node() -> bool:
-	return false
+	return true
 
 
 # Overide this function in the derived classes to return something usable.
-# Generate all the outputs for every output slots declared.
+# Generates all the outputs for every declared outputs.
 func _generate_outputs() -> void:
 	pass
 
 
-func _debug_generate_outputs() -> void:
-	var start_time = OS.get_ticks_msec()
-	_generate_outputs()
-	var gen_time = OS.get_ticks_msec() - start_time
-	print(display_name + ": " + str(gen_time) + "ms")
-
-
-# Overide this function to customize how the output cache should be cleared. If
-# you have memory to free or anything else, that's where you should define it.
+# Overide this function if you have memory to free or anything else in between
+# calls to _generate_outputs.
 func _clear_cache():
 	pass
 
 
-# Clear previously generated outputs
-func _reset_output():
-	for slot in output:
-		if slot is Array:
-			for res in slot:
-				if res is Node:
-					res.queue_free()
-		elif slot is Node:
-			slot.queue_free()
-
-	output = {}
-	for idx in _outputs:
-		output[idx] = []
-
-
-func _on_value_changed(_value, _idx) -> void:
-	reset()
-	emit_signal("node_changed", self, true)
-
-
-func _on_connection_changed() -> void:
-	._on_connection_changed()
-	reset()
-	emit_signal("node_changed", self, true)
+func _to_string() -> String:
+	return "[" + unique_name + "]"
