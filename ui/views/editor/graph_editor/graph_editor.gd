@@ -32,6 +32,8 @@ func _ready() -> void:
 	var button := FloatButton.new()
 	button.subwindow_id = "graph_editor"
 	box.add_child(button)
+	var auto_scale := AutoScale.new()
+	button.add_child(auto_scale)
 
 
 func connect_node_and_notify(from, from_port, to, to_port):
@@ -99,6 +101,10 @@ func force_redraw() -> void:
 
 
 func delete_node(node: ProtonNodeUi) -> void:
+	for c in get_connection_list():
+		if c.to == node.name or c.from == node.name:
+			disconnect_node_and_notify(c.from, c.from_port, c.to, c.to_port)
+
 	remove_child(node)
 	_graph.delete_node(node.proton_node)
 	node_deleted.emit(node)

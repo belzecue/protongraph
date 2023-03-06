@@ -257,10 +257,13 @@ func _create_component_for(io: ProtonNodeSlot, is_output := false) -> GraphNodeU
 	else:
 		component = UserInterfaceUtil.create_component(io.name, io.type, io.options)
 
-	if io.local_value != null:
+	# Make sure the local value has the proper type. Mismatch can happen
+	# when dynamically changing slots types.
+	var component_default_value = component.get_value()
+	if io.local_value != null and typeof(io.local_value) == typeof(component_default_value):
 		component.set_value(io.local_value)
 	else:
-		io.local_value = component.get_value()
+		io.local_value = component_default_value
 
 	if is_output:
 		component.name = "Output"
@@ -286,7 +289,9 @@ func _setup_connection_slots() -> void:
 	var ui: GraphNodeUiComponent
 	var type
 	var opts: SlotOptions
-	var slot_icon_multi := TextureUtil.get_texture("res://ui/icons/input_slot_multi.svg")
+	var slot_icon_default := TextureUtil.get_texture("res://ui/icons/icon_slot_default.svg")
+	var slot_icon_multi := TextureUtil.get_texture("res://ui/icons/icon_slot_multi.svg")
+	var slot_icon_field := TextureUtil.get_texture("res://ui/icons/icon_slot_field.svg")
 
 	for idx in _input_component_map:
 		ui = _input_component_map[idx]
@@ -299,14 +304,24 @@ func _setup_connection_slots() -> void:
 
 		if opts.allow_multiple_connections:
 			set("slot/" + str(slot) + "/left_icon", slot_icon_multi)
+		elif opts.supports_field:
+			set("slot/" + str(slot) + "/left_icon", slot_icon_field)
+		else:
+			set("slot/" + str(slot) + "/left_icon", slot_icon_default)
 
 	for idx in _output_component_map:
 		ui = _output_component_map[idx]
 		slot = ui.slot
 		type = proton_node.outputs[idx].type
+		opts = proton_node.outputs[idx].options
 		set_slot_enabled_right(slot, true)
 		set_slot_type_right(slot, type)
 		set_slot_color_right(slot, DataType.COLORS[type])
+
+		if opts.supports_field:
+			set("slot/" + str(slot) + "/right_icon", slot_icon_field)
+		else:
+			set("slot/" + str(slot) + "/right_icon", slot_icon_default)
 
 
 func _update_frame_stylebox():
